@@ -1,0 +1,36 @@
+# Rust
+target/
+**/*.rs.bk
+Cargo.lock.bak
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude Code 작업 보조 (글로벌 정책에 따라 추적 제외)
+.claude/
+CLAUDE.md
+
+# docs/note, docs/track, docs/design 등 작업 기록은 git 추적 제외
+# 단, docs/spec/, docs/visual/ 는 명시적으로 tracked
+docs/note/
+docs/track/
+docs/design/
+docs/guide/
+
+# 운영자별 로컬 설정 (예시: .env, secrets)
+.env
+.env.local
+*.env.local
+secrets/
+*.pem
+
+# 임시 audit DB (개발 시)
+audit.db
+*.sqlite
+*.sqlite-journal

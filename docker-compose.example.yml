@@ -1,0 +1,97 @@
+# PengAgent example deployment.
+# 운영자가 자기 환경에 맞춰 조정해서 docker-compose.yml로 사용.
+#
+# 필수 환경변수 (호출 시):
+#   PENGAGENT_TOKEN                  # P0 시크릿 (시크릿 매니저로 주입)
+#   OPS_REPO_HOST_PATH               # host 측 ops repo 절대 경로
+#   PENGAGENT_BIND_HOST              # VPN IP (예: 100.x.x.x). 인터넷 노출 금지!
+#   PENGAGENT_RESTART_WHITELIST      # 예: "gateway,adapter-*,caddy"
+#
+# 예: 시크릿 매니저(BWS)로 토큰 주입 후 실행
+#   bws run -- docker compose -f docker-compose.example.yml up -d
+
+services:
+  peng-agent:
+    image: ghcr.io/lostchoco/peng-agent:latest
+    container_name: peng-agent
+    restart: unless-stopped
+    networks: [agent_internal]
+    ports:
+      # ⚠️ VPN IP에만 바인드! 0.0.0.0 또는 public IP는 절대 금지
+      - "${PENGAGENT_BIND_HOST:-127.0.0.1}:9000:9000"
+    environment:
+      - PENGAGENT_TOKEN
+      - PENGAGENT_BIND=0.0.0.0:9000   # 컨테이너 내부는 0.0.0.0, host 측 바인드는 위 ports
+      - PENGAGENT_OPS_REPO_PATH=/srv/ops
+      - PENGAGENT_COMPOSE_FILE=docker-compose.yml
+      - PENGAGENT_RESTART_WHITELIST
+      - PENGAGENT_METRICS_URL=http://node_exporter:9100/metrics
+      - PENGAGENT_DOCKER_PROXY_URL=http://docker_proxy:2375
+      - PENGAGENT_AUDIT_DB=/var/lib/pengagent/audit.db
+      - PENGAGENT_LOG_LEVEL=info
+    volumes:
+      # 호스트의 ops repo (운영자가 매핑) — git pull + compose 실행 대상
+      - ${OPS_REPO_HOST_PATH}:/srv/ops:rw
+      # audit log (영구화)
+      - peng_agent_audit:/var/lib/pengagent
+      # docker socket — compose 실행용 (compose는 여러 API 사용해서 proxy만으론 부족)
+      # ⚠️ root 권한급. agent 코드 자체가 임의 명령·컨테이너 생성·이미지 build 안 한다는 게 보장.
+      # 더 안전한 대안: docker-rootless + 별도 user. v2 후보.
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - node_exporter
+      - docker_proxy
+
+  node_exporter:
+    image: prom/node-exporter:v1.8.2
+    container_name: peng_agent_node_exporter
+    restart: unless-stopped
+    networks: [agent_internal]
+    pid: host
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/rootfs'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+
+  docker_proxy:
+    image: tecnativa/docker-socket-proxy:0.3.0
+    container_name: peng_agent_docker_proxy
+    restart: unless-stopped
+    networks: [agent_internal]
+    volumes:
+      # read-only — proxy는 read만, write는 위 peng-agent의 직접 socket으로
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      # 화이트리스트: containers list/inspect/logs만 + restart (POST 일부)
+      - CONTAINERS=1
+      - POST=1                 # restart endpoint 위해 (POST /containers/<id>/restart)
+      - LOG_LEVEL=warn
+      # 명시적 금지 (default 0이지만 명시)
+      - INFO=0
+      - VERSION=1              # version 정도는 client 디버깅용 OK
+      - NETWORKS=0
+      - VOLUMES=0
+      - SERVICES=0
+      - TASKS=0
+      - SECRETS=0
+      - CONFIGS=0
+      - EXEC=0
+      - IMAGES=0
+      - PLUGINS=0
+      - BUILD=0
+      - SWARM=0
+      - NODES=0
+      - DISTRIBUTION=0
+      - SESSION=0
+
+networks:
+  agent_internal:
+    internal: true        # 인터넷 노출 0. peng-agent만 외부 bind (위 ports)
+
+volumes:
+  peng_agent_audit:

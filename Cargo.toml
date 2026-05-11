@@ -1,0 +1,53 @@
+[package]
+name = "peng-agent"
+version = "0.1.0"
+edition = "2021"
+authors = ["LostCHoco <58216826+LostCHoco@users.noreply.github.com>"]
+license = "AGPL-3.0-only"
+repository = "https://github.com/LostCHoco/PengAgent"
+description = "Generic admin agent for Docker + git-managed self-host environments. PengAgent Protocol v1 reference implementation."
+readme = "README.md"
+
+[dependencies]
+# HTTP server. axum 0.7 (0.8은 axum-test 16과 호환 안 됨, 다음 버전 release 시 bump).
+axum = { version = "0.7", features = ["macros"] }
+tokio = { version = "1", features = ["full"] }
+tower = "0.5"
+tower-http = { version = "0.5", features = ["trace", "limit"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# HTTP client (node_exporter + docker-socket-proxy proxy)
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "stream"] }
+
+# Constant-time token 비교 (timing attack 방어)
+subtle = "2.6"
+
+# Audit log (SQLite)
+rusqlite = { version = "0.32", features = ["bundled"] }
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Error handling
+anyhow = "1"
+thiserror = "2"
+
+# 시간
+chrono = { version = "0.4", features = ["serde"] }
+
+# UUID (audit event ID 등)
+uuid = { version = "1", features = ["v4", "serde"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full", "test-util"] }
+axum-test = "16"
+
+[profile.release]
+opt-level = "z"      # binary size 최적화 (multi-arch image 가벼움)
+lto = true
+codegen-units = 1
+strip = true
