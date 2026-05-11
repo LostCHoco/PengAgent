@@ -2,8 +2,9 @@
 # AGPL-3.0-only — source available, LICENSE included in image.
 
 # ─── Stage 1: build ────────────────────────────────────────────────
-# Rust 1.85+ 필요: 의존성(idna_adapter 등)이 `edition2024` feature 사용.
-FROM rust:1.85-alpine AS builder
+# Rust 1.86+ 필요: idna_adapter → icu_collections/icu_locale_core/icu_normalizer 가 rustc 1.86 요구.
+# 1.90으로 안전 마진. floating 대신 명시 (외부 변동 격리).
+FROM rust:1.90-alpine AS builder
 
 RUN apk add --no-cache musl-dev pkgconfig
 
