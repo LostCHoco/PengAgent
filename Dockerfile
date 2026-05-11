@@ -2,7 +2,8 @@
 # AGPL-3.0-only — source available, LICENSE included in image.
 
 # ─── Stage 1: build ────────────────────────────────────────────────
-FROM rust:1.83-alpine AS builder
+# Rust 1.85+ 필요: 의존성(idna_adapter 등)이 `edition2024` feature 사용.
+FROM rust:1.85-alpine AS builder
 
 RUN apk add --no-cache musl-dev pkgconfig
 
